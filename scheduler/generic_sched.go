@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	log "github.com/hashicorp/go-hclog"
@@ -387,12 +388,12 @@ func (s *GenericScheduler) computeJobAllocs() error {
 			update.DeploymentID = s.deployment.GetID()
 			update.DeploymentStatus = nil
 		}
-		s.ctx.Plan().AppendAlloc(update)
+		s.ctx.Plan().AppendAlloc(update, false)
 	}
 
 	// Handle the annotation updates
 	for _, update := range results.attributeUpdates {
-		s.ctx.Plan().AppendAlloc(update)
+		s.ctx.Plan().AppendAlloc(update, false)
 	}
 
 	// Nothing remaining to do if placement is not required
@@ -429,6 +430,27 @@ func (s *GenericScheduler) computeJobAllocs() error {
 	return s.computePlacements(destructive, place)
 }
 
+// downgradedJobForPlacement returns the job appropriate for non-canary placement replacement
+func (s *GenericScheduler) downgradedJobForPlacement(p placementResult) (string, *structs.Job, error) {
+	ns, jobID := s.job.Namespace, s.job.ID
+	tgName := p.TaskGroup().Name
+
+	// find deployments and use the latest promoted or canaried version
+	deployments, err := s.state.DeploymentsByJobID(nil, ns, jobID, false)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to lookup job deployments: %v", err)
+	}
+	sort.Slice(deployments, func(i, j int) bool { return deployments[i].JobVersion > deployments[i].JobVersion })
+	for _, d := range deployments {
+		if dstate := d.TaskGroups[tgName]; dstate != nil && (dstate.Promoted || dstate.DesiredCanaries == 0) {
+			job, err := s.state.JobByIDAndVersion(nil, ns, jobID, d.JobVersion)
+			return d.ID, job, err
+		}
+	}
+
+	return "", nil, nil
+}
+
 // computePlacements computes placements for allocations. It is given the set of
 // destructive updates to place and the set of new placements to place.
 func (s *GenericScheduler) computePlacements(destructive, place []placementResult) error {
@@ -456,6 +478,25 @@ func (s *GenericScheduler) computePlacements(destructive, place []placementResul
 		for _, missing := range results {
 			// Get the task group
 			tg := missing.TaskGroup()
+
+			var downgradedJob *structs.Job
+
+			if missing.DowngradeNonCanary() {
+				jobDeploymentID, job, err := s.downgradedJobForPlacement(missing)
+				if err != nil {
+					return err
+				}
+				if job != nil {
+					if g := job.LookupTaskGroup(tg.Name); g != nil {
+						tg = g
+						downgradedJob = job
+						deploymentID = jobDeploymentID
+
+						// ensure we are operating on the correct job
+						s.stack.SetJob(job)
+					}
+				}
+			}
 
 			// Check if this task group has already failed
 			if metric, ok := s.failedTGAllocs[tg.Name]; ok {
@@ -488,6 +529,11 @@ func (s *GenericScheduler) computePlacements(destructive, place []placementResul
 
 			// Compute top K scoring node metadata
 			s.ctx.Metrics().PopulateScoreMetaData()
+
+			// restore stack to use the latest job version again
+			if downgradedJob != nil {
+				s.stack.SetJob(s.job)
+			}
 
 			// Set fields based on if we found an allocation option
 			if option != nil {
@@ -544,10 +590,14 @@ func (s *GenericScheduler) computePlacements(destructive, place []placementResul
 					}
 				}
 
+				if downgradedJob != nil {
+					alloc.Job = downgradedJob
+				}
+
 				s.handlePreemptions(option, alloc, missing)
 
 				// Track the placement
-				s.plan.AppendAlloc(alloc)
+				s.plan.AppendAlloc(alloc, downgradedJob != nil)
 
 			} else {
 				// Lazy initialize the failed map
