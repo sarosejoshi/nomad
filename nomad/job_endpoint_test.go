@@ -421,7 +421,7 @@ func TestJobEndpoint_Register_ConnectWithSidecarTask(t *testing.T) {
 	require.Equal("test", sidecarTask.Meta["source"])
 	require.Equal(500, sidecarTask.Resources.CPU)
 	require.Equal(connectSidecarResources().MemoryMB, sidecarTask.Resources.MemoryMB)
-	cfg := connectDriverConfig(false)
+	cfg := connectSidecarDriverConfig()
 	cfg["labels"] = map[string]interface{}{
 		"foo": "bar",
 	}

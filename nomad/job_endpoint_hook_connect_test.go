@@ -221,3 +221,17 @@ func TestJobEndpointConnect_groupConnectGatewayValidate(t *testing.T) {
 		require.EqualError(t, err, `Consul Connect Gateway service requires Task Group with network mode of type "bridge" or "host"`)
 	})
 }
+
+func TestJobEndpointConnect_newConnectGatewayTask_host(t *testing.T) {
+	task := newConnectGatewayTask("service1", true)
+	require.Equal(t, "connect-ingress-service1", task.Name)
+	require.Equal(t, "connect-ingress:service1", string(task.Kind))
+	require.Equal(t, ">= 1.8.0", task.Constraints[0].RTarget)
+	require.Equal(t, "host", task.Config["network_mode"])
+	require.Nil(t, task.Lifecycle)
+}
+
+func TestJobEndpointConnect_newConnectGatewayTask_bridge(t *testing.T) {
+	task := newConnectGatewayTask("service1", false)
+	require.NotContains(t, task.Config, "network_mode")
+}

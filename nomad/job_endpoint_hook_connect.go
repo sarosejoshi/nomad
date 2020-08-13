@@ -20,13 +20,10 @@ var (
 		}
 	}
 
-	// connectDriverConfig is the driver configuration used by the injected
-	// connect proxy sidecar or gateway task.
-	//
-	// When being used as a gateway host networking is accepted. By setting nethost,
-	// the network_mode config parameter will be set to "host".
-	connectDriverConfig = func(nethost bool) map[string]interface{} {
-		m := map[string]interface{}{
+	// connectSidecarDriverConfig is the driver configuration used by the injected
+	// connect proxy sidecar task.
+	connectSidecarDriverConfig = func() map[string]interface{} {
+		return map[string]interface{}{
 			"image": "${meta.connect.sidecar_image}",
 			"args": []interface{}{
 				"-c", structs.EnvoyBootstrapPath,
@@ -34,8 +31,24 @@ var (
 				"--disable-hot-restart",
 			},
 		}
+	}
 
-		if nethost {
+	// connectGatewayDriverConfig is the Docker driver configuration used by the
+	// injected connect proxy sidecar task.
+	//
+	// A gateway may run in a group with bridge or host networking, and if host
+	// networking is being used the network_mode driver configuration is set here.
+	connectGatewayDriverConfig = func(hostNetwork bool) map[string]interface{} {
+		m := map[string]interface{}{
+			"image": "${meta.connect.gateway_image}",
+			"args": []interface{}{
+				"-c", structs.EnvoyBootstrapPath,
+				"-l", "${meta.connect.log_level}",
+				"--disable-hot-restart",
+			},
+		}
+
+		if hostNetwork {
 			m["network_mode"] = "host"
 		}
 
@@ -223,7 +236,7 @@ func newConnectGatewayTask(serviceName string, nethost bool) *structs.Task {
 		Name:          fmt.Sprintf("%s-%s", structs.ConnectIngressPrefix, serviceName),
 		Kind:          structs.NewTaskKind(structs.ConnectIngressPrefix, serviceName),
 		Driver:        "docker",
-		Config:        connectDriverConfig(nethost),
+		Config:        connectGatewayDriverConfig(nethost),
 		ShutdownDelay: 5 * time.Second,
 		LogConfig: &structs.LogConfig{
 			MaxFiles:      2,
@@ -242,7 +255,7 @@ func newConnectTask(serviceName string) *structs.Task {
 		Name:          fmt.Sprintf("%s-%s", structs.ConnectProxyPrefix, serviceName),
 		Kind:          structs.NewTaskKind(structs.ConnectProxyPrefix, serviceName),
 		Driver:        "docker",
-		Config:        connectDriverConfig(false),
+		Config:        connectSidecarDriverConfig(),
 		ShutdownDelay: 5 * time.Second,
 		LogConfig: &structs.LogConfig{
 			MaxFiles:      2,
