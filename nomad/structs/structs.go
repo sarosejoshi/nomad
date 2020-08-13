@@ -5668,10 +5668,11 @@ func (tg *TaskGroup) Validate(j *Job) error {
 	if tg.Count < 0 {
 		mErr.Errors = append(mErr.Errors, errors.New("Task group count can't be negative"))
 	}
-	if len(tg.Tasks) == 0 && !tg.UsesConnectGateway() {
-		// defining a connect gateway is an implicit task
+	if len(tg.Tasks) == 0 {
+		// could be a lone consul gateway inserted by the connect mutator
 		mErr.Errors = append(mErr.Errors, errors.New("Missing tasks for task group"))
 	}
+
 	for idx, constr := range tg.Constraints {
 		if err := constr.Validate(); err != nil {
 			outer := fmt.Errorf("Constraint %d validation failed: %s", idx+1, err)
