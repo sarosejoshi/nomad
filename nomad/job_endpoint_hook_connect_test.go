@@ -132,6 +132,8 @@ func TestJobEndpointConnect_ConnectInterpolation(t *testing.T) {
 }
 
 func TestJobEndpointConnect_groupConnectSidecarValidate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("sidecar 0 networks", func(t *testing.T) {
 		require.EqualError(t, groupConnectSidecarValidate(&structs.TaskGroup{
 			Name:     "g1",
@@ -159,6 +161,8 @@ func TestJobEndpointConnect_groupConnectSidecarValidate(t *testing.T) {
 }
 
 func TestJobEndpointConnect_getNamedTaskForNativeService(t *testing.T) {
+	t.Parallel()
+
 	t.Run("named exists", func(t *testing.T) {
 		task, err := getNamedTaskForNativeService(&structs.TaskGroup{
 			Name:  "g1",
@@ -193,5 +197,27 @@ func TestJobEndpointConnect_getNamedTaskForNativeService(t *testing.T) {
 		}, "s1", "t3")
 		require.EqualError(t, err, "task t3 named by Consul Connect Native service g1->s1 does not exist")
 		require.Nil(t, task)
+	})
+}
+
+func TestJobEndpointConnect_groupConnectGatewayValidate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no group network", func(t *testing.T) {
+		err := groupConnectGatewayValidate(&structs.TaskGroup{
+			Name:     "g1",
+			Networks: nil,
+		})
+		require.EqualError(t, err, `Consul Connect gateways require exactly 1 network, found 0 in group "g1"`)
+	})
+
+	t.Run("bad network mode", func(t *testing.T) {
+		err := groupConnectGatewayValidate(&structs.TaskGroup{
+			Name: "g1",
+			Networks: structs.Networks{{
+				Mode: "",
+			}},
+		})
+		require.EqualError(t, err, `Consul Connect Gateway service requires Task Group with network mode of type "bridge" or "host"`)
 	})
 }

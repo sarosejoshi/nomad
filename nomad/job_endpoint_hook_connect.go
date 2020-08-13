@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/nomad/helper"
 	"github.com/hashicorp/nomad/helper/uuid"
 	"github.com/hashicorp/nomad/nomad/structs"
 	"github.com/pkg/errors"
@@ -20,9 +21,12 @@ var (
 	}
 
 	// connectDriverConfig is the driver configuration used by the injected
-	// connect proxy sidecar task
-	connectDriverConfig = func() map[string]interface{} {
-		return map[string]interface{}{
+	// connect proxy sidecar or gateway task.
+	//
+	// When being used as a gateway host networking is accepted. By setting nethost,
+	// the network_mode config parameter will be set to "host".
+	connectDriverConfig = func(nethost bool) map[string]interface{} {
+		m := map[string]interface{}{
 			"image": "${meta.connect.sidecar_image}",
 			"args": []interface{}{
 				"-c", structs.EnvoyBootstrapPath,
@@ -30,16 +34,34 @@ var (
 				"--disable-hot-restart",
 			},
 		}
+
+		if nethost {
+			m["network_mode"] = "host"
+		}
+
+		return m
 	}
 
-	// connectVersionConstraint is used when building the sidecar task to ensure
+	// connectMinimalVersionConstraint is used when building the sidecar task to ensure
 	// the proper Consul version is used that supports the necessary Connect
 	// features. This includes bootstrapping envoy with a unix socket for Consul's
 	// gRPC xDS API.
-	connectVersionConstraint = func() *structs.Constraint {
+	connectMinimalVersionConstraint = func() *structs.Constraint {
 		return &structs.Constraint{
 			LTarget: "${attr.consul.version}",
 			RTarget: ">= 1.6.0-beta1",
+			Operand: structs.ConstraintSemver,
+		}
+	}
+
+	// connectGatewayVersionConstraint is used when building a connect gateway
+	// task to ensure proper Consul version is used that supports Connect Gateway
+	// features. This includes making use of Consul Configuration Entries of type
+	// {ingress,terminating,mesh}-gateway.
+	connectGatewayVersionConstraint = func() *structs.Constraint {
+		return &structs.Constraint{
+			LTarget: "${attr.consul.version}",
+			RTarget: ">= 1.8.0",
 			Operand: structs.ConstraintSemver,
 		}
 	}
@@ -123,7 +145,10 @@ func getNamedTaskForNativeService(tg *structs.TaskGroup, serviceName, taskName s
 // qualify, configure a port for envoy to use to expose their paths.
 func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 	for _, service := range g.Services {
-		if service.Connect.HasSidecar() {
+		switch {
+		// mutate depending on what the connect block is being used for
+
+		case service.Connect.HasSidecar():
 			// Check to see if the sidecar task already exists
 			task := getSidecarTaskForService(g, service.Name)
 
@@ -168,7 +193,7 @@ func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 			// create a port for the sidecar task's proxy port
 			makePort(fmt.Sprintf("%s-%s", structs.ConnectProxyPrefix, service.Name))
 
-		} else if service.Connect.IsNative() {
+		case service.Connect.IsNative():
 			// find the task backing this connect native service and set the kind
 			nativeTaskName := service.TaskName
 			if t, err := getNamedTaskForNativeService(g, service.Name, nativeTaskName); err != nil {
@@ -178,11 +203,10 @@ func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 				service.TaskName = t.Name // in case the task was inferred
 			}
 
-		} else if service.Connect.IsGateway() {
-			// use the default envoy image, but there is no support for a custom task
-			task := newConnectTask(service.Name)
-			task.Lifecycle = nil                                                        // just a normal task (todo cleanup)
-			task.Kind = structs.NewTaskKind(structs.ConnectIngressPrefix, service.Name) // (todo cleanup)
+		case service.Connect.IsGateway():
+			// use the default envoy image, for now there is no support for a custom task
+			nethost := g.Networks[0].Mode == "host"
+			task := newConnectGatewayTask(service.Name, nethost)
 			g.Tasks = append(g.Tasks, task)
 			task.Canonicalize(job, g)
 		}
@@ -193,13 +217,32 @@ func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 	return nil
 }
 
+func newConnectGatewayTask(serviceName string, nethost bool) *structs.Task {
+	return &structs.Task{
+		// Name is used in container name so must start with '[A-Za-z0-9]'
+		Name:          fmt.Sprintf("%s-%s", structs.ConnectIngressPrefix, serviceName),
+		Kind:          structs.NewTaskKind(structs.ConnectIngressPrefix, serviceName),
+		Driver:        "docker",
+		Config:        connectDriverConfig(nethost),
+		ShutdownDelay: 5 * time.Second,
+		LogConfig: &structs.LogConfig{
+			MaxFiles:      2,
+			MaxFileSizeMB: 2,
+		},
+		Resources: connectSidecarResources(),
+		Constraints: structs.Constraints{
+			connectGatewayVersionConstraint(),
+		},
+	}
+}
+
 func newConnectTask(serviceName string) *structs.Task {
-	task := &structs.Task{
+	return &structs.Task{
 		// Name is used in container name so must start with '[A-Za-z0-9]'
 		Name:          fmt.Sprintf("%s-%s", structs.ConnectProxyPrefix, serviceName),
 		Kind:          structs.NewTaskKind(structs.ConnectProxyPrefix, serviceName),
 		Driver:        "docker",
-		Config:        connectDriverConfig(),
+		Config:        connectDriverConfig(false),
 		ShutdownDelay: 5 * time.Second,
 		LogConfig: &structs.LogConfig{
 			MaxFiles:      2,
@@ -211,21 +254,24 @@ func newConnectTask(serviceName string) *structs.Task {
 			Sidecar: true,
 		},
 		Constraints: structs.Constraints{
-			connectVersionConstraint(),
+			connectMinimalVersionConstraint(),
 		},
 	}
-
-	return task
 }
 
 func groupConnectValidate(g *structs.TaskGroup) (warnings []error, err error) {
 	for _, s := range g.Services {
-		if s.Connect.HasSidecar() {
+		switch {
+		case s.Connect.HasSidecar():
 			if err := groupConnectSidecarValidate(g); err != nil {
 				return nil, err
 			}
-		} else if s.Connect.IsNative() {
+		case s.Connect.IsNative():
 			if err := groupConnectNativeValidate(g, s); err != nil {
+				return nil, err
+			}
+		case s.Connect.IsGateway():
+			if err := groupConnectGatewayValidate(g); err != nil {
 				return nil, err
 			}
 		}
@@ -250,5 +296,21 @@ func groupConnectNativeValidate(g *structs.TaskGroup, s *structs.Service) error 
 	if _, err := getNamedTaskForNativeService(g, s.Name, s.TaskName); err != nil {
 		return err
 	}
+	return nil
+}
+
+func groupConnectGatewayValidate(g *structs.TaskGroup) error {
+	// the group needs to be either bridge or host mode so we know how to configure
+	// the docker driver config
+
+	if n := len(g.Networks); n != 1 {
+		return fmt.Errorf("Consul Connect gateways require exactly 1 network, found %d in group %q", n, g.Name)
+	}
+
+	modes := []string{"bridge", "host"}
+	if !helper.SliceStringContains(modes, g.Networks[0].Mode) {
+		return fmt.Errorf(`Consul Connect Gateway service requires Task Group with network mode of type "bridge" or "host"`)
+	}
+
 	return nil
 }
