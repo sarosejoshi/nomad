@@ -237,6 +237,70 @@ func TestJobEndpoint_Register_Connect(t *testing.T) {
 	require.Exactly(sidecarTask, out.TaskGroups[0].Tasks[1])
 }
 
+func TestJobEndpoint_Register_ConnectIngressGateway(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+
+	s1, cleanupS1 := TestServer(t, func(c *Config) {
+		c.NumSchedulers = 0 // Prevent automatic dequeue
+	})
+	defer cleanupS1()
+	codec := rpcClient(t, s1)
+	testutil.WaitForLeader(t, s1.RPC)
+
+	job := mock.ConnectIngressGatewayJob("bridge")
+
+	// Create the register request
+	req := &structs.JobRegisterRequest{
+		Job: job,
+		WriteRequest: structs.WriteRequest{
+			Region:    "global",
+			Namespace: job.Namespace,
+		},
+	}
+
+	// Fetch the response
+	var resp structs.JobRegisterResponse
+	r.NoError(msgpackrpc.CallWithCodec(codec, "Job.Register", req, &resp))
+	r.NotZero(resp.Index)
+
+	// Check for the node in the FSM
+	state := s1.fsm.State()
+	ws := memdb.NewWatchSet()
+	out, err := state.JobByID(ws, job.Namespace, job.ID)
+	r.NoError(err)
+	r.NotNil(out)
+	r.Equal(resp.JobModifyIndex, out.CreateIndex)
+
+	// Check that the gateway task got injected
+	r.Len(out.TaskGroups[0].Tasks, 1)
+	task := out.TaskGroups[0].Tasks[0]
+	r.Equal("connect-ingress-my-ingress-service", task.Name)
+	r.Equal("connect-ingress:my-ingress-service", string(task.Kind))
+	r.Equal("docker", task.Driver)
+	r.NotNil(task.Config)
+
+	// Check that round-tripping does not inject a duplicate task
+	out.Meta["test"] = "abc"
+	req.Job = out
+	r.NoError(msgpackrpc.CallWithCodec(codec, "Job.Register", req, &resp))
+	r.NotZero(resp.Index)
+
+	// Check for the new node in the fsm
+	state = s1.fsm.State()
+	ws = memdb.NewWatchSet()
+	out, err = state.JobByID(ws, job.Namespace, job.ID)
+	r.NoError(err)
+	r.NotNil(out)
+	r.Equal(resp.JobModifyIndex, out.CreateIndex)
+
+	// Check we did not re-add the task that was added the first time
+	r.Len(out.TaskGroups[0].Tasks, 1)
+	// todo yeah thats busted
+
+	// YOU ARE HERE
+}
+
 func TestJobEndpoint_Register_ConnectExposeCheck(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)

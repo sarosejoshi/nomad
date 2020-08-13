@@ -668,6 +668,33 @@ func ConnectNativeJob(mode string) *structs.Job {
 	return job
 }
 
+func ConnectIngressGatewayJob(mode string) *structs.Job {
+	job := Job()
+	tg := job.TaskGroups[0]
+	tg.Networks = []*structs.NetworkResource{{
+		Mode: mode,
+	}}
+	tg.Services = []*structs.Service{{
+		Name:      "my-ingress-service",
+		PortLabel: "9999",
+		Connect: &structs.ConsulConnect{
+			Gateway: &structs.ConsulGateway{
+				Ingress: &structs.ConsulIngressConfigEntry{
+					Listeners: []*structs.ConsulIngressListener{{
+						Port:     2000,
+						Protocol: "tcp",
+						Services: []*structs.ConsulIngressService{{
+							Name: "service1",
+						}},
+					}},
+				},
+			},
+		},
+	}}
+	tg.Tasks = nil
+	return job
+}
+
 func BatchJob() *structs.Job {
 	job := &structs.Job{
 		Region:      "global",

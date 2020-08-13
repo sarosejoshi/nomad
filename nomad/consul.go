@@ -608,6 +608,7 @@ func (c *consulConfigsAPI) setConfigEntry(ctx context.Context, entry api.ConfigE
 	return err
 }
 
+// todo is this tested?
 func convertIngressGatewayConfig(service string, entry *structs.ConsulIngressConfigEntry) api.ConfigEntry {
 	var listeners []api.IngressListener = nil
 	for _, listener := range entry.Listeners {
@@ -625,10 +626,15 @@ func convertIngressGatewayConfig(service string, entry *structs.ConsulIngressCon
 		})
 	}
 
+	tlsEnabled := false
+	if entry.TLS != nil && entry.TLS.Enabled {
+		tlsEnabled = true
+	}
+
 	return &api.IngressGatewayConfigEntry{
 		Kind:      api.IngressGateway,
 		Name:      service,
-		TLS:       api.GatewayTLSConfig{Enabled: entry.TLS.Enabled},
+		TLS:       api.GatewayTLSConfig{Enabled: tlsEnabled},
 		Listeners: listeners,
 	}
 }
