@@ -132,7 +132,22 @@ func getSidecarTaskForService(tg *structs.TaskGroup, svc string) *structs.Task {
 }
 
 func isSidecarForService(t *structs.Task, svc string) bool {
-	return t.Kind == structs.TaskKind(fmt.Sprintf("%s:%s", structs.ConnectProxyPrefix, svc))
+	return t.Kind == structs.NewTaskKind(structs.ConnectProxyPrefix, svc)
+}
+
+func hasGatewayTaskForService(tg *structs.TaskGroup, svc string) bool {
+	for _, t := range tg.Tasks {
+		switch {
+		case isIngressGatewayForService(t, svc):
+			// also terminating and mesh in the future
+			return true
+		}
+	}
+	return false
+}
+
+func isIngressGatewayForService(t *structs.Task, svc string) bool {
+	return t.Kind == structs.NewTaskKind(structs.ConnectIngressPrefix, svc)
 }
 
 // getNamedTaskForNativeService retrieves the Task with the name specified in the
@@ -217,11 +232,14 @@ func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 			}
 
 		case service.Connect.IsGateway():
-			// use the default envoy image, for now there is no support for a custom task
-			nethost := g.Networks[0].Mode == "host"
-			task := newConnectGatewayTask(service.Name, nethost)
-			g.Tasks = append(g.Tasks, task)
-			task.Canonicalize(job, g)
+			// inject the gateway task only if it does not yet already exist
+			if !hasGatewayTaskForService(g, service.Name) {
+				// use the default envoy image, for now there is no support for a custom task
+				nethost := g.Networks[0].Mode == "host"
+				task := newConnectGatewayTask(service.Name, nethost)
+				g.Tasks = append(g.Tasks, task)
+				task.Canonicalize(job, g)
+			}
 		}
 	}
 

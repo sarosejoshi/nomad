@@ -235,3 +235,30 @@ func TestJobEndpointConnect_newConnectGatewayTask_bridge(t *testing.T) {
 	task := newConnectGatewayTask("service1", false)
 	require.NotContains(t, task.Config, "network_mode")
 }
+
+func TestJobEndpointConnect_hasGatewayTaskForService(t *testing.T) {
+	t.Run("no gateway task", func(t *testing.T) {
+		result := hasGatewayTaskForService(&structs.TaskGroup{
+			Name: "group",
+			Tasks: []*structs.Task{{
+				Name: "task1",
+				Kind: "",
+			}},
+		}, "my-service")
+		require.False(t, result)
+	})
+
+	t.Run("has gateway task", func(t *testing.T) {
+		result := hasGatewayTaskForService(&structs.TaskGroup{
+			Name: "group",
+			Tasks: []*structs.Task{{
+				Name: "task1",
+				Kind: "",
+			}, {
+				Name: "ingress-gateway-my-service",
+				Kind: structs.NewTaskKind(structs.ConnectIngressPrefix, "my-service"),
+			}},
+		}, "my-service")
+		require.True(t, result)
+	})
+}
