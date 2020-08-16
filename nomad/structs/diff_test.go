@@ -2623,9 +2623,9 @@ func TestTaskGroupDiff(t *testing.T) {
 									ConnectTimeout:                  helper.TimeToPtr(1 * time.Second),
 									EnvoyGatewayBindTaggedAddresses: false,
 									EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
-										"service1:": {
+										"service1": {
 											Address: "10.0.0.1",
-											Port:    2000,
+											Port:    2001,
 										},
 									},
 									EnvoyGatewayNoDefaultBind: false,
@@ -2698,7 +2698,7 @@ func TestTaskGroupDiff(t *testing.T) {
 									ConnectTimeout:                  helper.TimeToPtr(2 * time.Second),
 									EnvoyGatewayBindTaggedAddresses: true,
 									EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
-										"service1:": {
+										"service1": {
 											Address: "10.0.0.2",
 											Port:    2002,
 										},
@@ -3022,21 +3022,62 @@ func TestTaskGroupDiff(t *testing.T) {
 													{
 														Type: DiffTypeEdited,
 														Name: "ConnectTimeout",
-														Old:  "11s",
-														New:  "22s",
+														Old:  "1s",
+														New:  "2s",
+													},
+													{
+														Type: DiffTypeEdited,
+														Name: "EnvoyDNSDiscoveryType",
+														Old:  "LOGICAL_DNS",
+														New:  "STRICT_DNS",
+													},
+													{
+														Type: DiffTypeEdited,
+														Name: "EnvoyGatewayBindTaggedAddresses",
+														Old:  "false",
+														New:  "true",
+													},
+													{
+														Type: DiffTypeEdited,
+														Name: "EnvoyGatewayNoDefaultBind",
+														Old:  "false",
+														New:  "true",
 													},
 												},
 												Objects: []*ObjectDiff{
-													// todo add
+													{
+														Type: DiffTypeEdited,
+														Name: "EnvoyGatewayBindAddresses",
+														Fields: []*FieldDiff{
+															{
+																Type: DiffTypeEdited,
+																Name: "service1",
+																Old:  "10.0.0.1:2001",
+																New:  "10.0.0.2:2002",
+															},
+														},
+													},
+													{
+														Type: DiffTypeEdited,
+														Name: "Config",
+														Fields: []*FieldDiff{
+															{
+																Type: DiffTypeEdited,
+																Name: "foo",
+																Old:  "1",
+																New:  "2",
+															},
+														},
+													},
 												},
 											},
-											{
-												Type:    DiffTypeEdited,
-												Name:    "Ingress",
-												Objects: []*ObjectDiff{
-													// todo add
-												},
-											},
+											//{
+											//	Type:    DiffTypeEdited,
+											//	Name:    "Ingress",
+											//	Objects: []*ObjectDiff{
+											//		// todo add
+											//	},
+											//},
 										},
 									},
 								},

@@ -869,15 +869,50 @@ func connectGatewayProxyDiff(prev, next *ConsulGatewayProxy, contextual bool) *O
 	// Diff the primitive fields.
 	diff.Fields = fieldDiffs(oldPrimitiveFlat, newPrimitiveFlat, contextual)
 
-	// todo Diff objects
+	// Diff the EnvoyGatewayBindAddresses map.
+	bindAddrsDiff := connectGatewayProxyEnvoyBindAddrsDiff(prev.EnvoyGatewayBindAddresses, next.EnvoyGatewayBindAddresses, contextual)
+	if bindAddrsDiff != nil {
+		diff.Objects = append(diff.Objects, bindAddrsDiff)
+	}
+
+	// Diff the opaque Config map.
+	if cDiff := configDiff(prev.Config, next.Config, contextual); cDiff != nil {
+		diff.Objects = append(diff.Objects, cDiff)
+	}
 
 	return diff
 }
 
-func connectGatewayProxyEnvoyBindAddrsDiff(prev, next map[string]*ConsulGatewayBindAddress, contextual string) *ObjectDiff {
+// connectGatewayProxyEnvoyBindAddrsDiff returns the diff of two maps. If contextual
+// diff is enabled, all fields will be returned, even if no diff occurred.
+func connectGatewayProxyEnvoyBindAddrsDiff(prev, next map[string]*ConsulGatewayBindAddress, contextual bool) *ObjectDiff {
 	diff := &ObjectDiff{Type: DiffTypeNone, Name: "EnvoyGatewayBindAddresses"}
-	// todo how to diff a map?
-	return nil
+	if reflect.DeepEqual(prev, next) {
+		return nil
+	} else if len(prev) == 0 {
+		diff.Type = DiffTypeAdded
+	} else if len(next) == 0 {
+		diff.Type = DiffTypeDeleted
+	} else {
+		diff.Type = DiffTypeEdited
+	}
+
+	// convert to string representation
+	prevMap := make(map[string]string, len(prev))
+	nextMap := make(map[string]string, len(next))
+
+	for k, v := range prev {
+		prevMap[k] = fmt.Sprintf("%s:%d", v.Address, v.Port)
+	}
+
+	for k, v := range next {
+		nextMap[k] = fmt.Sprintf("%s:%d", v.Address, v.Port)
+	}
+
+	oldPrimitiveFlat := flatmap.Flatten(prevMap, nil, false)
+	newPrimitiveFlat := flatmap.Flatten(nextMap, nil, false)
+	diff.Fields = fieldDiffs(oldPrimitiveFlat, newPrimitiveFlat, contextual)
+	return diff
 }
 
 // connectSidecarServiceDiff returns the diff of two ConsulSidecarService objects.
