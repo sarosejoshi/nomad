@@ -827,9 +827,82 @@ func connectGatewayDiff(prev, next *ConsulGateway, contextual bool) *ObjectDiff 
 		diff.Objects = append(diff.Objects, gatewayProxyDiff)
 	}
 
-	// todo Diff the ConsulGatewayIngress fields.
+	// Diff the ConsulGatewayIngress fields.
+	gatewayIngressDiff := connectGatewayIngressDiff(prev.Ingress, next.Ingress, contextual)
+	if gatewayIngressDiff != nil {
+		diff.Objects = append(diff.Objects, gatewayIngressDiff)
+	}
 
 	return diff
+}
+
+func connectGatewayIngressDiff(prev, next *ConsulIngressConfigEntry, contextual bool) *ObjectDiff {
+	diff := &ObjectDiff{Type: DiffTypeNone, Name: "Ingress"}
+	var oldPrimitiveFlat, newPrimitiveFlat map[string]string
+
+	if reflect.DeepEqual(prev, next) {
+		return nil
+	} else if prev == nil {
+		prev = new(ConsulIngressConfigEntry)
+		diff.Type = DiffTypeAdded
+		newPrimitiveFlat = flatmap.Flatten(next, nil, true)
+	} else if next == nil {
+		next = new(ConsulIngressConfigEntry)
+		diff.Type = DiffTypeDeleted
+		oldPrimitiveFlat = flatmap.Flatten(prev, nil, true)
+	} else {
+		diff.Type = DiffTypeEdited
+		oldPrimitiveFlat = flatmap.Flatten(prev, nil, true)
+		newPrimitiveFlat = flatmap.Flatten(next, nil, true)
+	}
+
+	// Diff the primitive fields.
+	diff.Fields = fieldDiffs(oldPrimitiveFlat, newPrimitiveFlat, contextual)
+
+	// Diff the ConsulGatewayTLSConfig objects.
+	tlsConfigDiff := connectGatewayTLSConfigDiff(prev.TLS, next.TLS, contextual)
+	if tlsConfigDiff != nil {
+		diff.Objects = append(diff.Objects, tlsConfigDiff)
+	}
+
+	// Diff the Listeners lists.
+	gatewayIngressListenersDiff := connectGatewayIngressListenersDiff(prev.Listeners, next.Listeners, contextual)
+	if gatewayIngressListenersDiff != nil {
+		diff.Objects = append(diff.Objects, gatewayIngressListenersDiff)
+	}
+
+	return diff
+}
+
+func connectGatewayTLSConfigDiff(prev, next *ConsulGatewayTLSConfig, contextual bool) *ObjectDiff {
+	diff := &ObjectDiff{Type: DiffTypeNone, Name: "TLS"}
+	var oldPrimitiveFlat, newPrimitiveFlat map[string]string
+
+	if reflect.DeepEqual(prev, next) {
+		return nil
+	} else if prev == nil {
+		prev = new(ConsulGatewayTLSConfig)
+		diff.Type = DiffTypeAdded
+		newPrimitiveFlat = flatmap.Flatten(prev, nil, true)
+	} else if next == nil {
+		next = new(ConsulGatewayTLSConfig)
+		diff.Type = DiffTypeDeleted
+		oldPrimitiveFlat = flatmap.Flatten(next, nil, true)
+	} else {
+		diff.Type = DiffTypeEdited
+		oldPrimitiveFlat = flatmap.Flatten(prev, nil, true)
+		newPrimitiveFlat = flatmap.Flatten(next, nil, true)
+	}
+
+	// Diff the primitive field.
+	diff.Fields = fieldDiffs(oldPrimitiveFlat, newPrimitiveFlat, contextual)
+
+	return diff
+}
+
+func connectGatewayIngressListenersDiff(prev, next []*ConsulIngressListener, contextual bool) *ObjectDiff {
+	// todo (see upstreams for example)
+	return nil
 }
 
 func connectGatewayProxyDiff(prev, next *ConsulGatewayProxy, contextual bool) *ObjectDiff {
@@ -841,11 +914,11 @@ func connectGatewayProxyDiff(prev, next *ConsulGatewayProxy, contextual bool) *O
 	} else if prev == nil {
 		prev = new(ConsulGatewayProxy)
 		diff.Type = DiffTypeAdded
-		newPrimitiveFlat = flatmap.Flatten(next, nil, true)
+		newPrimitiveFlat = flatmap.Flatten(prev, nil, true)
 	} else if next == nil {
 		next = new(ConsulGatewayProxy)
 		diff.Type = DiffTypeDeleted
-		oldPrimitiveFlat = flatmap.Flatten(prev, nil, true)
+		oldPrimitiveFlat = flatmap.Flatten(next, nil, true)
 	} else {
 		diff.Type = DiffTypeEdited
 		oldPrimitiveFlat = flatmap.Flatten(prev, nil, true)

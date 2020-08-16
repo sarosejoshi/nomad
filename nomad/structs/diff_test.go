@@ -2895,7 +2895,6 @@ func TestTaskGroupDiff(t *testing.T) {
 									},
 								},
 							},
-
 							{
 								Type: DiffTypeEdited,
 								Name: "ConsulConnect",
@@ -3071,13 +3070,29 @@ func TestTaskGroupDiff(t *testing.T) {
 													},
 												},
 											},
-											//{
-											//	Type:    DiffTypeEdited,
-											//	Name:    "Ingress",
-											//	Objects: []*ObjectDiff{
-											//		// todo add
-											//	},
-											//},
+											{
+												Type: DiffTypeEdited,
+												Name: "Ingress",
+												Objects: []*ObjectDiff{
+													{
+														Type: DiffTypeEdited,
+														Name: "TLS",
+														Fields: []*FieldDiff{
+															{
+																Type: DiffTypeEdited,
+																Name: "Enabled",
+																Old:  "false",
+																New:  "true",
+															},
+														},
+													},
+													{
+														Type: DiffTypeEdited,
+														Name: "Listeners",
+														// tbd todo
+													},
+												},
+											},
 										},
 									},
 								},
