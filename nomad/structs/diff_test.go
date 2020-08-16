@@ -2618,6 +2618,35 @@ func TestTaskGroupDiff(t *testing.T) {
 									"foo": "baz",
 								},
 							},
+							Gateway: &ConsulGateway{
+								Proxy: &ConsulGatewayProxy{
+									ConnectTimeout:                  helper.TimeToPtr(1 * time.Second),
+									EnvoyGatewayBindTaggedAddresses: false,
+									EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
+										"service1:": {
+											Address: "10.0.0.1",
+											Port:    2000,
+										},
+									},
+									EnvoyGatewayNoDefaultBind: false,
+									EnvoyDNSDiscoveryType:     "LOGICAL_DNS",
+									Config: map[string]interface{}{
+										"foo": 1,
+									},
+								},
+								Ingress: &ConsulIngressConfigEntry{
+									TLS: &ConsulGatewayTLSConfig{
+										Enabled: false,
+									},
+									Listeners: []*ConsulIngressListener{{
+										Port:     3001,
+										Protocol: "tcp",
+										Services: []*ConsulIngressService{{
+											Name: "listener1",
+										}},
+									}},
+								},
+							},
 						},
 					},
 				},
@@ -2662,6 +2691,36 @@ func TestTaskGroupDiff(t *testing.T) {
 									Config: map[string]interface{}{
 										"foo": "qux",
 									},
+								},
+							},
+							Gateway: &ConsulGateway{
+								Proxy: &ConsulGatewayProxy{
+									ConnectTimeout:                  helper.TimeToPtr(2 * time.Second),
+									EnvoyGatewayBindTaggedAddresses: true,
+									EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
+										"service1:": {
+											Address: "10.0.0.2",
+											Port:    2002,
+										},
+									},
+									EnvoyGatewayNoDefaultBind: true,
+									EnvoyDNSDiscoveryType:     "STRICT_DNS",
+									Config: map[string]interface{}{
+										"foo": 2,
+									},
+								},
+								Ingress: &ConsulIngressConfigEntry{
+									TLS: &ConsulGatewayTLSConfig{
+										Enabled: true,
+									},
+									Listeners: []*ConsulIngressListener{{
+										Port:     3002,
+										Protocol: "http",
+										Services: []*ConsulIngressService{{
+											Name:  "listener2",
+											Hosts: []string{"127.0.0.1", "127.0.0.1:3002"},
+										}},
+									}},
 								},
 							},
 						},
@@ -2948,6 +3007,34 @@ func TestTaskGroupDiff(t *testing.T) {
 														Old:  "baz",
 														New:  "",
 													},
+												},
+											},
+										},
+									},
+									{
+										Type: DiffTypeEdited,
+										Name: "Gateway",
+										Objects: []*ObjectDiff{
+											{
+												Type: DiffTypeEdited,
+												Name: "Proxy",
+												Fields: []*FieldDiff{
+													{
+														Type: DiffTypeEdited,
+														Name: "ConnectTimeout",
+														Old:  "11s",
+														New:  "22s",
+													},
+												},
+												Objects: []*ObjectDiff{
+													// todo add
+												},
+											},
+											{
+												Type:    DiffTypeEdited,
+												Name:    "Ingress",
+												Objects: []*ObjectDiff{
+													// todo add
 												},
 											},
 										},
