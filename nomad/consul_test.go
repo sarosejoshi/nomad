@@ -19,7 +19,6 @@ import (
 var _ ConsulACLsAPI = (*consulACLsAPI)(nil)
 var _ ConsulACLsAPI = (*mockConsulACLsAPI)(nil)
 var _ ConsulConfigsAPI = (*consulConfigsAPI)(nil)
-var _ ConsulConfigsAPI = (*mockConfigsAPI)(nil)
 
 func TestConsulConfigsAPI_SetIngressGatewayConfigEntry(t *testing.T) {
 	t.Parallel()
@@ -41,7 +40,6 @@ func TestConsulConfigsAPI_SetIngressGatewayConfigEntry(t *testing.T) {
 			require.Equal(t, expErr, err)
 		} else {
 			require.NoError(t, err)
-			// assert on the mock?
 		}
 	}
 
@@ -52,15 +50,6 @@ func TestConsulConfigsAPI_SetIngressGatewayConfigEntry(t *testing.T) {
 	t.Run("set ingress CE failure", func(t *testing.T) {
 		try(t, errors.New("consul broke"))
 	})
-}
-
-type mockConfigsAPI struct {
-	lock    sync.Mutex
-	stopped bool
-}
-
-func (m mockConfigsAPI) SetIngressGatewayConfigEntry(ctx context.Context, service string, entry *structs.ConsulIngressConfigEntry) error {
-	panic("implement me")
 }
 
 type revokeRequest struct {

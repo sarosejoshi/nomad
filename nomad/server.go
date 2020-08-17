@@ -665,6 +665,9 @@ func (s *Server) Shutdown() error {
 	// Stop the Consul ACLs token revocations
 	s.consulACLs.Stop()
 
+	// Stop being able to set Configuration Entries
+	s.consulConfigEntries.Stop()
+
 	return nil
 }
 
