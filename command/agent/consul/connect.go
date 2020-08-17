@@ -37,8 +37,11 @@ func newConnect(serviceName string, nc *structs.ConsulConnect, networks structs.
 	}
 }
 
+// newConnectGateway creates a new Consul AgentServiceConnectProxyConfig struct based on
+// a Nomad Connect struct. If the Nomad Connect struct does not contain a gateway, nil
+// will be returned as this service is not a gateway.
 func newConnectGateway(serviceName string, connect *structs.ConsulConnect) *api.AgentServiceConnectProxyConfig {
-	if connect.IsGateway() {
+	if !connect.IsGateway() {
 		return nil
 	}
 

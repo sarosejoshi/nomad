@@ -1222,6 +1222,9 @@ func (g *ConsulGateway) Validate() error {
 	return fmt.Errorf("Consul Gateway ingress Configuration Entry must be set")
 }
 
+// ConsulGatewayBindAddress is equivalent to Consul's api/catalog.go ServiceAddress
+// struct, as this is used to encode values to pass along to Envoy (i.e. via
+// JSON encoding).
 type ConsulGatewayBindAddress struct {
 	Address string
 	Port    int
