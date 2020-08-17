@@ -3087,9 +3087,88 @@ func TestTaskGroupDiff(t *testing.T) {
 														},
 													},
 													{
-														Type: DiffTypeEdited,
-														Name: "Listeners",
-														// tbd todo
+														Type: DiffTypeAdded,
+														Name: "Listener",
+														Fields: []*FieldDiff{
+															{
+																Type: DiffTypeAdded,
+																Name: "Port",
+																Old:  "",
+																New:  "3002",
+															},
+															{
+																Type: DiffTypeAdded,
+																Name: "Protocol",
+																Old:  "",
+																New:  "http",
+															},
+														},
+														Objects: []*ObjectDiff{
+															{
+																Type: DiffTypeAdded,
+																Name: "ConsulIngressService",
+																Fields: []*FieldDiff{
+																	{
+																		Type: DiffTypeAdded,
+																		Name: "Name",
+																		Old:  "",
+																		New:  "listener2",
+																	},
+																},
+																Objects: []*ObjectDiff{
+																	{
+																		Type: DiffTypeAdded,
+																		Name: "Hosts",
+																		Fields: []*FieldDiff{
+																			{
+																				Type: DiffTypeAdded,
+																				Name: "Hosts",
+																				Old:  "",
+																				New:  "127.0.0.1",
+																			},
+																			{
+																				Type: DiffTypeAdded,
+																				Name: "Hosts",
+																				Old:  "",
+																				New:  "127.0.0.1:3002",
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+													{
+														Type: DiffTypeDeleted,
+														Name: "Listener",
+														Fields: []*FieldDiff{
+															{
+																Type: DiffTypeDeleted,
+																Name: "Port",
+																Old:  "3001",
+																New:  "",
+															},
+															{
+																Type: DiffTypeDeleted,
+																Name: "Protocol",
+																Old:  "tcp",
+																New:  "",
+															},
+														},
+														Objects: []*ObjectDiff{
+															{
+																Type: DiffTypeDeleted,
+																Name: "ConsulIngressService",
+																Fields: []*FieldDiff{
+																	{
+																		Type: DiffTypeDeleted,
+																		Name: "Name",
+																		Old:  "listener1",
+																		New:  "",
+																	},
+																},
+															},
+														},
 													},
 												},
 											},
