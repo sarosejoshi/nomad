@@ -311,15 +311,15 @@ func TestEnvoyBootstrapHook_with_SI_token(t *testing.T) {
 	require.Equal(t, token, value)
 }
 
-// TestTaskRunner_EnvoyBootstrapHook_Prestart asserts the EnvoyBootstrapHook
+// TestTaskRunner_EnvoyBootstrapHook_sidecar_ok asserts the EnvoyBootstrapHook
 // creates Envoy's bootstrap.json configuration based on Connect proxy sidecars
 // registered for the task.
-func TestTaskRunner_EnvoyBootstrapHook_Ok(t *testing.T) {
+func TestTaskRunner_EnvoyBootstrapHook_sidecar_ok(t *testing.T) {
 	t.Parallel()
 	testutil.RequireConsul(t)
 
-	testconsul := getTestConsul(t)
-	defer testconsul.Stop()
+	testConsul := getTestConsul(t)
+	defer testConsul.Stop()
 
 	alloc := mock.Alloc()
 	alloc.AllocatedResources.Shared.Networks = []*structs.NetworkResource{
@@ -358,7 +358,7 @@ func TestTaskRunner_EnvoyBootstrapHook_Ok(t *testing.T) {
 
 	// Register Group Services
 	consulConfig := consulapi.DefaultConfig()
-	consulConfig.Address = testconsul.HTTPAddr
+	consulConfig.Address = testConsul.HTTPAddr
 	consulAPIClient, err := consulapi.NewClient(consulConfig)
 	require.NoError(t, err)
 
@@ -407,8 +407,21 @@ func TestTaskRunner_EnvoyBootstrapHook_Ok(t *testing.T) {
 	require.Equal(t, "", value)
 }
 
+func TestTaskRunner_EnvoyBootstrapHook_gateway_ok(t *testing.T) {
+	t.Parallel()
+	logger := testlog.HCLogger(t)
+
+	testConsul := getTestConsul(t)
+	defer testConsul.Stop()
+
+	// get an alloc
+	_ = logger
+
+	// YOU ARE HERE
+}
+
 // TestTaskRunner_EnvoyBootstrapHook_Noop asserts that the Envoy bootstrap hook
-// is a noop for non-Connect proxy sidecar tasks.
+// is a noop for non-Connect proxy sidecar / gateway tasks.
 func TestTaskRunner_EnvoyBootstrapHook_Noop(t *testing.T) {
 	t.Parallel()
 	logger := testlog.HCLogger(t)
@@ -517,4 +530,38 @@ func TestTaskRunner_EnvoyBootstrapHook_RecoverableError(t *testing.T) {
 	_, err = os.Open(filepath.Join(req.TaskDir.SecretsDir, "envoy_bootstrap.json"))
 	require.Error(t, err)
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestTaskRunner_EnvoyBootstrapHook_extractNameAndKind(t *testing.T) {
+	t.Run("connect sidecar", func(t *testing.T) {
+		kind, name, err := (*envoyBootstrapHook)(nil).extractNameAndKind(
+			structs.NewTaskKind(structs.ConnectProxyPrefix, "foo"),
+		)
+		require.Nil(t, err)
+		require.Equal(t, "connect-proxy", kind)
+		require.Equal(t, "foo", name)
+	})
+
+	t.Run("connect gateway", func(t *testing.T) {
+		kind, name, err := (*envoyBootstrapHook)(nil).extractNameAndKind(
+			structs.NewTaskKind(structs.ConnectIngressPrefix, "foo"),
+		)
+		require.Nil(t, err)
+		require.Equal(t, "connect-ingress", kind)
+		require.Equal(t, "foo", name)
+	})
+
+	t.Run("connect native", func(t *testing.T) {
+		_, _, err := (*envoyBootstrapHook)(nil).extractNameAndKind(
+			structs.NewTaskKind(structs.ConnectNativePrefix, "foo"),
+		)
+		require.EqualError(t, err, "envoy must be used as connect sidecar or gateway")
+	})
+
+	t.Run("normal task", func(t *testing.T) {
+		_, _, err := (*envoyBootstrapHook)(nil).extractNameAndKind(
+			structs.TaskKind(""),
+		)
+		require.EqualError(t, err, "envoy must be used as connect sidecar or gateway")
+	})
 }
