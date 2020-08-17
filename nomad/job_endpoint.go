@@ -285,8 +285,9 @@ func (j *Job) Register(args *structs.JobRegisterRequest, reply *structs.JobRegis
 	// probably room for improvement here.
 	fmt.Println("nomad/job_endpoint set config entries")
 	for service, entry := range args.Job.ConfigEntries() {
-		fmt.Println("conig entry, service:", service, "entry:", entry)
+		fmt.Println("config entry, service:", service, "entry:", entry)
 		ctx := context.Background()
+		// YOU ARE HERE
 		if err := j.srv.consulConfigEntries.SetIngressGatewayConfigEntry(ctx, service, entry); err != nil {
 			return err
 		}

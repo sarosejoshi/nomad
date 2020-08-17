@@ -14,27 +14,42 @@ type MockConfigsAPI struct {
 
 	lock  sync.Mutex
 	state struct {
-		error         error
-		configEntries map[string]*api.ConfigEntry
+		error   error
+		entries map[string]api.ConfigEntry
 	}
-}
-
-func (m MockConfigsAPI) Set(entry api.ConfigEntry, w *api.WriteOptions) (bool, *api.WriteMeta, error) {
-	// todo
-	return false, nil, nil
-}
-
-func (m MockConfigsAPI) Delete(kind, name string, w *api.WriteOptions) (*api.WriteMeta, error) {
-	// todo
-	return nil, nil
 }
 
 func NewMockConfigsAPI(l hclog.Logger) *MockConfigsAPI {
 	return &MockConfigsAPI{
 		logger: l.Named("mock_consul"),
 		state: struct {
-			error         error
-			configEntries map[string]*api.ConfigEntry
-		}{configEntries: make(map[string]*api.ConfigEntry)},
+			error   error
+			entries map[string]api.ConfigEntry
+		}{entries: make(map[string]api.ConfigEntry)},
 	}
+}
+
+// Set is a mock of ConfigAPI.Set
+func (m MockConfigsAPI) Set(entry api.ConfigEntry, w *api.WriteOptions) (bool, *api.WriteMeta, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.state.error != nil {
+		return false, nil, m.state.error
+	}
+
+	m.state.entries[entry.GetName()] = entry
+
+	return true, &api.WriteMeta{
+		RequestTime: 1,
+	}, nil
+}
+
+// SetError is a helper method for configuring an error that will be returned
+// on future calls to mocked methods.
+func (m *MockConfigsAPI) SetError(err error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.state.error = err
 }

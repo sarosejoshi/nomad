@@ -18,6 +18,50 @@ import (
 
 var _ ConsulACLsAPI = (*consulACLsAPI)(nil)
 var _ ConsulACLsAPI = (*mockConsulACLsAPI)(nil)
+var _ ConsulConfigsAPI = (*consulConfigsAPI)(nil)
+var _ ConsulConfigsAPI = (*mockConfigsAPI)(nil)
+
+func TestConsulConfigsAPI_SetIngressGatewayConfigEntry(t *testing.T) {
+	t.Parallel()
+
+	try := func(t *testing.T, expErr error) {
+		logger := testlog.HCLogger(t)
+		configsAPI := consul.NewMockConfigsAPI(logger) // agent
+		configsAPI.SetError(expErr)
+
+		c := NewConsulConfigsAPI(configsAPI, logger)
+
+		ctx := context.Background()
+		err := c.SetIngressGatewayConfigEntry(ctx, "service1", &structs.ConsulIngressConfigEntry{
+			TLS:       nil,
+			Listeners: nil,
+		})
+
+		if expErr != nil {
+			require.Equal(t, expErr, err)
+		} else {
+			require.NoError(t, err)
+			// assert on the mock?
+		}
+	}
+
+	t.Run("set ingress CE success", func(t *testing.T) {
+		try(t, nil)
+	})
+
+	t.Run("set ingress CE failure", func(t *testing.T) {
+		try(t, errors.New("consul broke"))
+	})
+}
+
+type mockConfigsAPI struct {
+	lock    sync.Mutex
+	stopped bool
+}
+
+func (m mockConfigsAPI) SetIngressGatewayConfigEntry(ctx context.Context, service string, entry *structs.ConsulIngressConfigEntry) error {
+	panic("implement me")
+}
 
 type revokeRequest struct {
 	accessorID string

@@ -111,7 +111,7 @@ type AgentAPI interface {
 // - operator:write (server only)
 type ConfigAPI interface {
 	Set(entry api.ConfigEntry, w *api.WriteOptions) (bool, *api.WriteMeta, error)
-	Delete(kind, name string, w *api.WriteOptions) (*api.WriteMeta, error)
+	// Delete(kind, name string, w *api.WriteOptions) (*api.WriteMeta, error) (not used)
 }
 
 // ACLsAPI is the consul/api.ACL API subset used by Nomad Server.
