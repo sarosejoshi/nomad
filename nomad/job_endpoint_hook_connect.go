@@ -235,8 +235,8 @@ func groupConnectHook(job *structs.Job, g *structs.TaskGroup) error {
 			// inject the gateway task only if it does not yet already exist
 			if !hasGatewayTaskForService(g, service.Name) {
 				// use the default envoy image, for now there is no support for a custom task
-				nethost := g.Networks[0].Mode == "host"
-				task := newConnectGatewayTask(service.Name, nethost)
+				netHost := g.Networks[0].Mode == "host"
+				task := newConnectGatewayTask(service.Name, netHost)
 				g.Tasks = append(g.Tasks, task)
 				task.Canonicalize(job, g)
 			}

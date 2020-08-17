@@ -110,6 +110,27 @@ func TestJobEndpointConnect_groupConnectHook(t *testing.T) {
 	require.Exactly(t, tgOut, job.TaskGroups[0])
 }
 
+func TestJobEndpointConnect_groupConnectHook_IngressGateway(t *testing.T) {
+	t.Parallel()
+
+	// Test that the connect gateway task is inserted if a gateway service exists
+	job := mock.ConnectIngressGatewayJob("bridge")
+
+	expTG := job.TaskGroups[0].Copy()
+	expTG.Tasks = []*structs.Task{
+		newConnectGatewayTask(expTG.Services[0].Name, false),
+	}
+	expTG.Tasks[0].Canonicalize(job, expTG)
+	expTG.Networks[0].Canonicalize()
+
+	require.NoError(t, groupConnectHook(job, job.TaskGroups[0]))
+	require.Exactly(t, expTG, job.TaskGroups[0])
+
+	// Test that the hook is idempotent
+	require.NoError(t, groupConnectHook(job, job.TaskGroups[0]))
+	require.Exactly(t, expTG, job.TaskGroups[0])
+}
+
 // TestJobEndpoint_ConnectInterpolation asserts that when a Connect sidecar
 // proxy task is being created for a group service with an interpolated name,
 // the service name is interpolated *before the task is created.
